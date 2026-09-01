@@ -1,0 +1,10 @@
+geolocation:
+  base-url: http://localhost:0/json
+  connect-timeout: 1s
+  read-timeout: 1s
+
+resilience4j:
+  retry:
+    instances:
+      geoLocation:
+        wait-duration: 0ms

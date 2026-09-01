@@ -1,0 +1,44 @@
+server:
+  forward-headers-strategy: framework
+
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+  cache:
+    type: caffeine
+    caffeine:
+      spec: maximumSize=10000,expireAfterWrite=3600s
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+        default-page-size: 20
+
+geolocation:
+  base-url: http://ip-api.com/json
+  connect-timeout: 2s
+  read-timeout: 3s
+
+resilience4j:
+  retry:
+    instances:
+      geoLocation:
+        max-attempts: 3
+        wait-duration: 200ms
+        retry-exceptions:
+          - com.empik.coupons.infrastructure.geolocation.GeoLocationUnavailableException
+        ignore-exceptions:
+          - com.empik.coupons.infrastructure.geolocation.GeoLocationResolutionException
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

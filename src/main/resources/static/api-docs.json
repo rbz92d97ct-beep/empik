@@ -1,0 +1,385 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Coupon Service API",
+    "description": "REST service for managing discount coupons",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Coupon Redemption",
+      "description": "Customer-facing endpoint for redeeming coupons. Country is resolved automatically from the caller's IP address."
+    },
+    {
+      "name": "Coupon Management",
+      "description": "Administrative endpoints for creating, reading, updating and deleting coupons."
+    }
+  ],
+  "paths": {
+    "/api/v1/coupons/{code}/redeem": {
+      "post": {
+        "tags": ["Coupon Redemption"],
+        "summary": "Redeem a coupon",
+        "description": "The caller's country is resolved automatically from their IP address. `X-Forwarded-For` is supported when the request arrives through a trusted reverse proxy.",
+        "operationId": "redeemCoupon",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RedeemCouponRequest" },
+              "example": { "userId": "user-123" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coupon redeemed successfully",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CouponResponse" }
+              }
+            }
+          },
+          "403": {
+            "description": "Coupon is not available in the caller's country",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetail" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "409": { "$ref": "#/components/responses/Conflict" },
+          "503": {
+            "description": "Geolocation service unavailable",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetail" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/management/coupons": {
+      "post": {
+        "tags": ["Coupon Management"],
+        "summary": "Create a new coupon",
+        "operationId": "createCoupon",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateCouponRequest" },
+              "example": {
+                "code": "SUMMER25",
+                "countryCode": "PL",
+                "maxUsages": 100
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Coupon created",
+            "headers": {
+              "Location": {
+                "schema": { "type": "string" },
+                "description": "URL of the created coupon, e.g. /api/v1/management/coupons/SUMMER25?countryCode=PL"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CouponResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "409": { "$ref": "#/components/responses/Conflict" }
+        }
+      },
+      "get": {
+        "tags": ["Coupon Management"],
+        "summary": "List coupons by country",
+        "operationId": "listCoupons",
+        "parameters": [
+          {
+            "name": "countryCode",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "PL" },
+            "description": "ISO 3166-1 alpha-2 country code"
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": { "type": "integer", "default": 0 }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": { "type": "integer", "default": 20 }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": { "type": "string", "default": "createdAt,desc" },
+            "description": "Sort field and direction, e.g. createdAt,desc"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of coupons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "content": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/CouponResponse" }
+                    },
+                    "totalElements": { "type": "integer" },
+                    "totalPages": { "type": "integer" },
+                    "number": { "type": "integer" },
+                    "size": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" }
+        }
+      }
+    },
+    "/api/v1/management/coupons/{code}": {
+      "get": {
+        "tags": ["Coupon Management"],
+        "summary": "Get coupon details",
+        "operationId": "getCoupon",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "countryCode",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "PL" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Coupon found",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CouponResponse" }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Coupon Management"],
+        "summary": "Update coupon max usages",
+        "operationId": "updateCoupon",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "countryCode",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "PL" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/UpdateCouponRequest" },
+              "example": { "maxUsages": 200 }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Coupon updated",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CouponResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ValidationError" },
+          "404": { "$ref": "#/components/responses/NotFound" },
+          "422": {
+            "description": "New maxUsages is below current usage count",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ProblemDetail" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Coupon Management"],
+        "summary": "Delete a coupon",
+        "description": "Deletes the coupon and all associated redemption records.",
+        "operationId": "deleteCoupon",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "countryCode",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "PL" }
+          }
+        ],
+        "responses": {
+          "204": { "description": "Coupon deleted" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CreateCouponRequest": {
+        "type": "object",
+        "required": ["code", "countryCode", "maxUsages"],
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "description": "Case-insensitive coupon code"
+          },
+          "countryCode": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 2,
+            "description": "ISO 3166-1 alpha-2 country code (e.g. PL, DE)"
+          },
+          "maxUsages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000,
+            "description": "Maximum number of times the coupon can be redeemed"
+          }
+        }
+      },
+      "UpdateCouponRequest": {
+        "type": "object",
+        "required": ["maxUsages"],
+        "properties": {
+          "maxUsages": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000,
+            "description": "New maximum number of redemptions. Must be >= current usage count."
+          }
+        }
+      },
+      "RedeemCouponRequest": {
+        "type": "object",
+        "required": ["userId"],
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "Identifier of the user redeeming the coupon"
+          }
+        }
+      },
+      "CouponResponse": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "code": { "type": "string" },
+          "countryCode": { "type": "string" },
+          "maxUsages": { "type": "integer" },
+          "currentUsages": { "type": "integer" },
+          "remainingUsages": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ProblemDetail": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "integer" },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Coupon not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetail" }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Coupon exhausted, already used by this user, or duplicate code",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ProblemDetail" }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Invalid request payload",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                { "$ref": "#/components/schemas/ProblemDetail" },
+                {
+                  "type": "object",
+                  "properties": {
+                    "fieldErrors": {
+                      "type": "object",
+                      "additionalProperties": { "type": "string" }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
